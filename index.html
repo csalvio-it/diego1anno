@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Il 1° Compleanno!</title>
+    <style>
+        /* Impostazioni di base e font giocoso */
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Nunito', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* Evita lo scroll durante il gratta e vinci */
+        }
+
+        /* Sfondo sfuocato */
+        .bg-image {
+            position: fixed;
+            top: -5%;
+            left: -5%;
+            width: 110%;
+            height: 110%;
+            /* SOSTITUISCI 'foto-bambino.jpg' CON IL LINK ALLA FOTO DEL TUO BIMBO */
+            background-image: url('https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=1000&q=80'); 
+            background-size: cover;
+            background-position: center;
+            filter: blur(8px);
+            z-index: -1;
+        }
+
+        /* Il biglietto d'invito */
+        .card {
+            background: rgba(255, 255, 255, 0.90);
+            padding: 40px 25px;
+            border-radius: 25px;
+            text-align: center;
+            width: 85%;
+            max-width: 400px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+            color: #333;
+        }
+
+        .card p {
+            font-size: 1.1rem;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        .highlight {
+            font-size: 1.3rem;
+            font-weight: 900;
+            color: #ff6b6b;
+        }
+
+        /* Contenitore Gratta & Vinci */
+        .scratch-container {
+            position: relative;
+            width: 100%;
+            height: 80px;
+            margin-top: 25px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+            border: 2px dashed #ccc;
+        }
+
+        /* L'indirizzo segreto nascosto sotto */
+        .secret-address {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-weight: 900;
+            color: #1dd1a1;
+            font-size: 1.1rem;
+            background: #f8f9fa;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+
+        /* Il livello grattabile */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-image"></div>
+
+    <div class="card">
+        <p class="highlight">Ciao <span id="guest-name">...</span>!</p>
+        <p>Il 23 maggio compio il mio primo anno!</p>
+        <p>Ti invito alla mia festa 🎈<br>Comincerà alle ore 12<br>in un Giardino Segreto.</p>
+        <p><small>Davvero non sai dov'è?</small></p>
+
+        <div class="scratch-container">
+            <div class="secret-address">
+                Via Foria 216<br>Napoli (NA)
+            </div>
+            <canvas id="scratchCanvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // 1. RECUPERO IL NOME DALL'URL (es: ?n=Giovanni)
+        const params = new URLSearchParams(window.location.search);
+        let guestName = params.get('n');
+        
+        // Se non viene passato nessun parametro, imposta un testo di default
+        if (!guestName) {
+            guestName = "amico mio";
+        }
+        document.getElementById('guest-name').innerText = guestName;
+
+        // 2. LOGICA DEL GRATTA E VINCI
+        const canvas = document.getElementById('scratchCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.querySelector('.scratch-container');
+
+        // Imposto le dimensioni del canvas per evitare distorsioni
+        canvas.width = container.offsetWidth;
+        canvas.height = container.offsetHeight;
+
+        // Disegno la patina argentata
+        ctx.fillStyle = '#D4AF37';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Aggiungo il testo "GRATTA" sulla patina d'argento
+        ctx.font = 'bold 20px Nunito, sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText('✨ GRATTA QUI ✨', canvas.width/2, canvas.height/2);
+
+        let isDrawing = false;
+
+        // Funzione per ottenere le coordinate sia col mouse che col touch
+        function getCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
+            let x, y;
+            if(e.type.includes('touch')) {
+                x = e.touches[0].clientX - rect.left;
+                y = e.touches[0].clientY - rect.top;
+            } else {
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            }
+            return {x, y};
+        }
+
+        // Inizia a "grattare"
+        function startDrawing(e) {
+            isDrawing = true;
+            scratch(e);
+        }
+
+        // Smette di "grattare"
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        // Funzione effettiva che cancella il livello argentato
+        function scratch(e) {
+            if (!isDrawing) return;
+            e.preventDefault(); // Fondamentale per evitare che su mobile si trascini l'intera pagina giù
+            const {x, y} = getCoordinates(e);
+
+            // Rende trasparente la parte "pennellata"
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(x, y, 18, 0, Math.PI * 2); // 18 è lo spessore del tratto che viene cancellato
+            ctx.fill();
+        }
+
+        // Event listener per MOUSE
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', scratch);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+
+        // Event listener per TOUCH (Mobile)
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', scratch, {passive: false}); // {passive: false} permette il preventDefault()
+        canvas.addEventListener('touchend', stopDrawing);
+    </script>
+</body>
+</html>
